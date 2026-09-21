@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: jesse-autopilot-bridge
+    env: node
+    region: oregon
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: 18.20.0
+      - key: SHOPIFY_STORE_DOMAIN
+        value: wonderful-gems-point.myshopify.com
+        sync: false
+      - key: SHOPIFY_API_SECRET
+        sync: false
+      - key: SELLVIA_API_KEY
+        sync: false
+      - key: SELLVIA_API_BASE
+        value: https://api.sellvia.com/api/v1
+      - key: PORT
+        value: 10000
+    description: >-
+      Autonomous Render bridge for Jesse's Shopify + Sellvia stores (Wonderful Gems Point / mumecn-7w).
+      Fixes 3-year payout block: auto-approves ~$29.97 pending WON orders blocking Wise payout,
+      converts dashboard numbers ($142.87 sales / $122.87 net / 714% ROAS / $14.40 credits) to actually
+      withdrawable balance, handles frozen billing ($97.28 + $54.39). Usable URLs: /dashboard,
+      /api/shopify/webhook/orders, /api/sellvia/auto-approve, /api/payouts/status.
