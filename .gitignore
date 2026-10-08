@@ -4,3 +4,7 @@ jesse-autopilot-bridge/
 ├── render.yaml ← ADD THIS NEXT
 ├── .env.example
 ├── .gitignore
+node_modules/
+data/
+*.db
+*.db-*

@@ -3,12 +3,16 @@ const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
 const axios = require('axios');
+const logger = require('./logger');
+const { openDb } = require('./db');
+const { withRetry } = require('./retry');
+const { sendAlert, errorMiddleware } = require('./alerts');
 
 // ---- Config: fail fast if secrets are missing (no placeholder fallbacks) ----
 const REQUIRED_ENV = ['SHOPIFY_API_SECRET', 'SELLVIA_API_KEY', 'ADMIN_TOKEN'];
 const missing = REQUIRED_ENV.filter((k) => !process.env[k]);
 if (missing.length) {
-  console.error(`Missing required env vars: ${missing.join(', ')}`);
+  logger.fatal(`Missing required env vars: ${missing.join(', ')}`);
   process.exit(1);
 }
 
@@ -17,6 +21,11 @@ const SHOPIFY_STORE_DOMAIN =
   process.env.SHOPIFY_STORE_DOMAIN || 'wonderful-gems-point.myshopify.com';
 const SELLVIA_API_BASE =
   process.env.SELLVIA_API_BASE || 'https://api.sellvia.com/api/v1';
+
+const MAX_ATTEMPTS = parseInt(process.env.APPROVAL_MAX_ATTEMPTS, 10) || 5;
+const BASE_DELAY_MS = parseInt(process.env.APPROVAL_BASE_DELAY_MS, 10) || 1000;
+const db = openDb();
+db.pruneOldWebhooks();
 
 const app = express();
 app.use(cors());
@@ -57,34 +66,48 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-async function approveSellviaOrder(orderId) {
-  try {
-    const resp = await axios.post(
-      `${SELLVIA_API_BASE}/orders/${encodeURIComponent(orderId)}/approve`,
-      {},
-      {
-        headers: {
-          Authorization: `Bearer ${SELLVIA_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        timeout: 15000,
-      }
-    );
-    return { success: true, data: resp.data };
-  } catch (err) {
-    const detail = err.response?.data || err.message;
-    console.error('Sellvia approve failed:', detail);
-    return { success: false, error: detail };
-  }
+async function approveSellviaOrderOnce(orderId) {
+  const resp = await axios.post(
+    `${SELLVIA_API_BASE}/orders/${encodeURIComponent(orderId)}/approve`,
+    {},
+    {
+      headers: {
+        Authorization: `Bearer ${SELLVIA_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      timeout: 15000,
+    }
+  );
+  return resp.data;
 }
 
-// In-memory dedupe for Shopify webhook retries (resets on restart/redeploy)
-const processedWebhooks = new Set();
-function markProcessed(id) {
-  processedWebhooks.add(id);
-  if (processedWebhooks.size > 5000) {
-    processedWebhooks.delete(processedWebhooks.values().next().value);
+// Approve with exponential backoff; persists every attempt outcome for audit
+async function approveSellviaOrder(orderId, shopifyOrderId = null, retryOpts = {}) {
+  const recordId = db.startApproval(orderId, shopifyOrderId);
+  const ctx = { sellviaOrderId: orderId, shopifyOrderId };
+  const result = await withRetry(() => approveSellviaOrderOnce(orderId), {
+    maxAttempts: MAX_ATTEMPTS,
+    baseDelayMs: BASE_DELAY_MS,
+    ...retryOpts,
+    onFailure: ({ attempt, err, permanent, willRetry }) => {
+      const detail = err.response?.data || err.message;
+      logger.warn({ ...ctx, attempt, permanent, willRetry, status: err.response?.status, detail }, 'Sellvia approve attempt failed');
+      db.updateApproval(recordId, {
+        status: willRetry ? 'retrying' : 'failed',
+        retryCount: attempt - 1,
+        error: detail,
+      });
+    },
+  });
+  if (result.success) {
+    db.updateApproval(recordId, { status: 'success', retryCount: result.retryCount });
+    logger.info({ ...ctx, attempts: result.attempts }, 'Sellvia order approved');
+    return { success: true, attempts: result.attempts, data: result.data };
   }
+  const error = result.error.response?.data || result.error.message;
+  logger.error({ ...ctx, attempts: result.attempts, permanent: result.permanent, error }, 'Sellvia approval failed');
+  await sendAlert('Sellvia approval failed', { ...ctx, attempts: result.attempts, permanent: result.permanent, error });
+  return { success: false, attempts: result.attempts, permanent: result.permanent, error };
 }
 
 // ---- Routes ----
@@ -95,7 +118,7 @@ app.get('/', (req, res) => {
 // Shopify webhook -> approve matching Sellvia order
 app.post('/api/shopify/webhook/orders', async (req, res) => {
   if (!verifyShopifyWebhook(req)) {
-    console.warn('Invalid Shopify HMAC');
+    logger.warn('Invalid Shopify HMAC');
     return res.status(401).send('Invalid HMAC');
   }
 
@@ -104,17 +127,19 @@ app.post('/api/shopify/webhook/orders', async (req, res) => {
 
   try {
     const webhookId = req.get('X-Shopify-Webhook-Id');
-    if (webhookId && processedWebhooks.has(webhookId)) {
-      console.log(`Duplicate webhook ${webhookId}, skipping`);
+    if (webhookId && !db.markWebhookProcessed(webhookId)) {
+      logger.info({ webhookId }, 'Duplicate webhook, skipping');
       return;
     }
-    if (webhookId) markProcessed(webhookId);
 
     const order = req.body;
-    console.log(`Shopify order ${order.id}: ${order.total_price} ${order.currency}`);
+    logger.info(
+      { webhookId, shopifyOrderId: order.id, total: order.total_price, currency: order.currency },
+      'Shopify order webhook received'
+    );
 
     if (order.financial_status !== 'paid') {
-      console.log(`Order ${order.id} not paid (${order.financial_status}), skipping`);
+      logger.info({ shopifyOrderId: order.id, financialStatus: order.financial_status }, 'Order not paid, skipping');
       return;
     }
 
@@ -123,16 +148,14 @@ app.post('/api/shopify/webhook/orders', async (req, res) => {
     )?.value;
 
     if (!sellviaOrderId) {
-      console.warn(`Order ${order.id} has no sellvia_order_id, skipping`);
+      logger.warn({ shopifyOrderId: order.id }, 'Order has no sellvia_order_id, skipping');
       return;
     }
 
-    const result = await approveSellviaOrder(sellviaOrderId);
-    if (result.success) {
-      console.log(`Approved Sellvia order ${sellviaOrderId} for Shopify ${order.id}`);
-    }
+    await approveSellviaOrder(sellviaOrderId, order.id);
   } catch (e) {
-    console.error('Webhook processing error:', e);
+    logger.error({ err: e }, 'Webhook processing error');
+    await sendAlert('Webhook processing error', { error: e.message });
   }
 });
 
@@ -150,16 +173,22 @@ app.post('/api/sellvia/auto-approve', requireAdmin, async (req, res) => {
 
     const results = [];
     for (const o of pending) {
-      const r = await approveSellviaOrder(o.id);
+      const { data, ...r } = await approveSellviaOrder(o.id);
       results.push({ order: o.id, ...r });
     }
     res.json({ message: `Attempted ${results.length} approvals`, results });
   } catch (err) {
+    logger.error({ err }, 'Batch auto-approve failed');
     res.status(500).json({
       error: err.message,
       hint: 'Check SELLVIA_API_KEY and SELLVIA_API_BASE in Render env vars',
     });
   }
+});
+
+// Audit trail of approval attempts (protected)
+app.get('/api/approvals', requireAdmin, (req, res) => {
+  res.json({ approvals: db.listApprovals(req.query.limit) });
 });
 
 // Payout checklist (protected). No fake numbers: check Sellvia > Finances for real balances.
@@ -182,5 +211,11 @@ app.get('/api/shopify/auth', (req, res) => {
   });
 });
 
+app.use(errorMiddleware);
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log('Server running on port ' + PORT));
+if (require.main === module) {
+  app.listen(PORT, () => logger.info({ port: PORT }, 'Server running'));
+}
+
+module.exports = { app, db, approveSellviaOrder };
