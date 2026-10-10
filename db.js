@@ -23,7 +23,17 @@ function openDb(file = process.env.DB_PATH || './data/bridge.db') {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS refund_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id TEXT NOT NULL,
+      customer_email TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      message TEXT,
+      status TEXT NOT NULL DEFAULT 'submitted' CHECK (status IN ('submitted','reviewing','approved','denied')),
+      created_at TEXT NOT NULL
+    );
     CREATE INDEX IF NOT EXISTS idx_approvals_sellvia ON approvals (sellvia_order_id);
+    CREATE INDEX IF NOT EXISTS idx_refund_requests_order ON refund_requests (order_id);
   `);
 
   const now = () => new Date().toISOString();
@@ -39,6 +49,13 @@ function openDb(file = process.env.DB_PATH || './data/bridge.db') {
     'UPDATE approvals SET status = ?, retry_count = ?, error = ?, updated_at = ? WHERE id = ?'
   );
   const listApprovals = db.prepare('SELECT * FROM approvals ORDER BY id DESC LIMIT ?');
+  const insertRefundRequest = db.prepare(
+    `INSERT INTO refund_requests (order_id, customer_email, reason, message, status, created_at)
+     VALUES (?, ?, ?, ?, 'submitted', ?)`
+  );
+  const listRefundRequests = db.prepare(
+    'SELECT * FROM refund_requests ORDER BY id DESC LIMIT ?'
+  );
 
   return {
     raw: db,
@@ -63,6 +80,20 @@ function openDb(file = process.env.DB_PATH || './data/bridge.db') {
     },
     listApprovals(limit = 100) {
       return listApprovals.all(Math.min(Math.max(Number(limit) || 100, 1), 500));
+    },
+    createRefundRequest({ orderId, customerEmail, reason, message = '' }) {
+      const t = now();
+      const result = insertRefundRequest.run(
+        String(orderId),
+        String(customerEmail),
+        String(reason),
+        String(message || ''),
+        t
+      );
+      return { id: Number(result.lastInsertRowid), orderId, customerEmail, reason, message: message || '', status: 'submitted', createdAt: t };
+    },
+    listRefundRequests(limit = 50) {
+      return listRefundRequests.all(Math.min(Math.max(Number(limit) || 50, 1), 500));
     },
     close() {
       db.close();
