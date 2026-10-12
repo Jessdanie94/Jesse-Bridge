@@ -21,6 +21,7 @@ const SHOPIFY_STORE_DOMAIN =
   process.env.SHOPIFY_STORE_DOMAIN || 'wonderful-gems-point.myshopify.com';
 const SELLVIA_API_BASE =
   process.env.SELLVIA_API_BASE || 'https://api.sellvia.com/api/v1';
+const REFUND_EMAIL_TO = 'papoosedaniels94@gmail.com';
 
 const MAX_ATTEMPTS = parseInt(process.env.APPROVAL_MAX_ATTEMPTS, 10) || 5;
 const BASE_DELAY_MS = parseInt(process.env.APPROVAL_BASE_DELAY_MS, 10) || 1000;
@@ -29,7 +30,6 @@ db.pruneOldWebhooks();
 
 const app = express();
 app.use(cors());
-app.use(express.urlencoded({ extended: true }));
 
 // Single body parser that also keeps the raw bytes for HMAC verification
 app.use(
@@ -67,27 +67,103 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function buildRefundEmail({ orderId, customerEmail, reason, message }) {
-  const safeReason = (reason || 'General issue').trim();
-  const safeMessage = (message || '').trim();
+  const safeReason = String(reason || 'General issue').trim();
+  const safeMessage = String(message || '').trim();
   const body = [
     'Hello,',
     '',
-    `I’m requesting a refund for order #${orderId || 'N/A'}.`,
-    `Customer email: ${customerEmail || 'not provided'}`,
-    `Reason: ${safeReason}`,
-    safeMessage ? `Details: ${safeMessage}` : '',
+    'I am requesting a refund for order #' + (orderId || 'N/A') + '.',
+    'Customer email: ' + (customerEmail || 'not provided'),
+    'Reason: ' + safeReason,
+    safeMessage ? 'Details: ' + safeMessage : '',
     '',
     'Please let me know the next steps and whether a refund has been approved.',
     '',
     'Thank you.',
-  ].filter(Boolean).join('\n');
+  ].filter((line, i, arr) => line !== '' || (arr[i - 1] !== '' && i !== 0)).join('\n');
 
   return {
-    to: 'papoosedaniels94@gmail.com',
-    subject: `Refund request for order #${orderId || 'N/A'}`,
+    to: REFUND_EMAIL_TO,
+    subject: 'Refund request for order #' + (orderId || 'N/A'),
     body,
   };
+}
+
+// Client-side script kept as a plain string (no nested template literals)
+const REFUND_PAGE_SCRIPT = [
+  "var form = document.getElementById('refundForm');",
+  "var success = document.getElementById('success');",
+  "var errorBox = document.getElementById('error');",
+  "form.addEventListener('submit', function (event) {",
+  "  event.preventDefault();",
+  "  success.style.display = 'none';",
+  "  errorBox.style.display = 'none';",
+  "  var payload = {};",
+  "  new FormData(form).forEach(function (v, k) { payload[k] = v; });",
+  "  fetch('/api/refund/request', {",
+  "    method: 'POST',",
+  "    headers: { 'Content-Type': 'application/json' },",
+  "    body: JSON.stringify(payload)",
+  "  }).then(function (res) {",
+  "    return res.json().then(function (data) { return { ok: res.ok, data: data }; });",
+  "  }).then(function (r) {",
+  "    if (!r.ok) throw new Error(r.data.error || 'Something went wrong');",
+  "    success.style.display = 'block';",
+  "    var d = r.data.emailDraft;",
+  "    window.location.href = 'mailto:' + d.to + '?subject=' + encodeURIComponent(d.subject) + '&body=' + encodeURIComponent(d.body);",
+  "  }).catch(function (err) {",
+  "    errorBox.textContent = err.message;",
+  "    errorBox.style.display = 'block';",
+  "  });",
+  "});",
+].join('\n');
+
+function renderRefundPage({ orderId, customerEmail }) {
+  return [
+    '<!doctype html>',
+    '<html lang="en"><head>',
+    '<meta charset="UTF-8" />',
+    '<meta name="viewport" content="width=device-width, initial-scale=1.0" />',
+    '<title>Refund Request</title>',
+    '<style>',
+    'body{font-family:Arial,sans-serif;background:#f8fafc;margin:0;padding:32px;color:#0f172a}',
+    '.card{max-width:760px;margin:0 auto;background:#fff;padding:24px;border-radius:12px;box-shadow:0 8px 24px rgba(15,23,42,.08)}',
+    'label{display:block;margin-top:16px;font-weight:600}',
+    'input,select,textarea{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;margin-top:6px}',
+    'textarea{min-height:140px}',
+    'button{margin-top:24px;background:#0f766e;color:#fff;border:0;border-radius:8px;padding:12px 18px;font-size:15px;cursor:pointer}',
+    '.success{margin-top:18px;color:#166534;background:#f0fdf4;border:1px solid #bbf7d0;padding:12px;border-radius:8px;display:none}',
+    '.error{margin-top:18px;color:#991b1b;background:#fef2f2;border:1px solid #fecaca;padding:12px;border-radius:8px;display:none}',
+    '</style></head><body><div class="card">',
+    '<h1>Refund Request</h1>',
+    '<form id="refundForm">',
+    '<label>Order ID<input name="orderId" value="' + escapeHtml(orderId) + '" required /></label>',
+    '<label>Your email<input name="customerEmail" type="email" value="' + escapeHtml(customerEmail) + '" required /></label>',
+    '<label>Reason<select name="reason">',
+    '<option>Product not as described</option>',
+    '<option>Damaged item</option>',
+    '<option>Wrong item received</option>',
+    '<option>Late delivery</option>',
+    '<option>Changed my mind</option>',
+    '<option>Other</option>',
+    '</select></label>',
+    '<label>Message<textarea name="message" placeholder="Tell us what happened"></textarea></label>',
+    '<button type="submit">Submit refund request</button>',
+    '</form>',
+    '<div id="success" class="success">Request saved. Your email app will open with a draft to send.</div>',
+    '<div id="error" class="error"></div>',
+    '</div><script>' + REFUND_PAGE_SCRIPT + '</script></body></html>',
+  ].join('\n');
 }
 
 async function approveSellviaOrderOnce(orderId) {
@@ -139,130 +215,34 @@ app.get('/', (req, res) => {
   res.json({ status: 'online', service: 'jesse-autopilot-bridge' });
 });
 
+// Public refund request page
 app.get('/refund-request', (req, res) => {
-  const orderId = (req.query.orderId || '').toString();
-  const customerEmail = (req.query.customerEmail || '').toString();
-  const draft = buildRefundEmail({
-    orderId,
-    customerEmail,
-    reason: 'Product not as described',
-    message: 'Please review this order and confirm the refund status.',
-  });
-
-  const html = `<!doctype html>
-    <html lang="en">
-      <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Refund Request</title>
-        <style>
-          body { font-family: Arial, sans-serif; background: #f8fafc; margin: 0; padding: 32px; color: #0f172a; }
-          .card { max-width: 760px; margin: 0 auto; background: #fff; padding: 24px; border-radius: 12px; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08); }
-          h1 { margin-top: 0; }
-          label { display: block; margin-top: 16px; font-weight: 600; }
-          input, select, textarea { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; margin-top: 6px; }
-          textarea { min-height: 180px; }
-          button { margin-top: 24px; background: #0f766e; color: white; border: 0; border-radius: 8px; padding: 12px 18px; font-size: 15px; cursor: pointer; }
-          .meta { color: #475569; font-size: 13px; margin-top: 12px; }
-          .success { margin-top: 18px; color: #166534; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 12px; border-radius: 8px; display: none; }
-          .error { margin-top: 18px; color: #991b1b; background: #fef2f2; border: 1px solid #fecaca; padding: 12px; border-radius: 8px; display: none; }
-        </style>
-      </head>
-      <body>
-        <div class="card">
-          <h1>Refund Request</h1>
-          <p class="meta">Draft will be addressed to <strong>${draft.to}</strong>.</p>
-          <form id="refundForm">
-            <label>Order ID
-              <input name="orderId" value="${orderId}" required />
-            </label>
-            <label>Customer email
-              <input name="customerEmail" type="email" value="${customerEmail}" required />
-            </label>
-            <label>Reason
-              <select name="reason">
-                <option value="Product not as described">Product not as described</option>
-                <option value="Damaged item">Damaged item</option>
-                <option value="Wrong item received">Wrong item received</option>
-                <option value="Late delivery">Late delivery</option>
-                <option value="Changed my mind">Changed my mind</option>
-                <option value="Other">Other</option>
-              </select>
-            </label>
-            <label>Message
-              <textarea name="message">${draft.body.replace(/"/g, '&quot;')}</textarea>
-            </label>
-            <button type="submit">Submit refund request</button>
-          </form>
-          <div id="success" class="success">Your refund request was saved and a draft email was prepared.</div>
-          <div id="error" class="error"></div>
-        </div>
-        <script>
-          const form = document.getElementById('refundForm');
-          const success = document.getElementById('success');
-          const error = document.getElementById('error');
-
-          form.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            success.style.display = 'none';
-            error.style.display = 'none';
-            const formData = new FormData(form);
-            const payload = Object.fromEntries(formData.entries());
-
-            try {
-              const res = await fetch('/api/refund/request', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-              });
-              const data = await res.json();
-              if (!res.ok) throw new Error(data.error || 'Something went wrong');
-              success.style.display = 'block';
-              const draft = data.emailDraft;
-              const mailto = `mailto:${draft.to}?subject=${encodeURIComponent(draft.subject)}&body=${encodeURIComponent(draft.body)}`;
-              window.location.href = mailto;
-            } catch (err) {
-              error.textContent = err.message;
-              error.style.display = 'block';
-            }
-          });
-        </script>
-      </body>
-    </html>`;
-
-  res.type('html').send(html);
+  res.type('html').send(
+    renderRefundPage({
+      orderId: req.query.orderId || '',
+      customerEmail: req.query.customerEmail || '',
+    })
+  );
 });
 
+// Save a refund request and return a prefilled email draft
 app.post('/api/refund/request', (req, res) => {
   const { orderId, customerEmail, reason, message } = req.body || {};
-
   if (!orderId || !customerEmail || !reason) {
     return res.status(400).json({ error: 'orderId, customerEmail, and reason are required' });
   }
-
-  const draft = buildRefundEmail({ orderId, customerEmail, reason, message });
-  const saved = db.createRefundRequest({
-    orderId,
-    customerEmail,
-    reason,
-    message: message || '',
-  });
-
+  const saved = db.createRefundRequest({ orderId, customerEmail, reason, message: message || '' });
   res.status(201).json({
     message: 'Refund request received',
     id: saved.id,
     status: saved.status,
-    emailDraft: draft,
+    emailDraft: buildRefundEmail({ orderId, customerEmail, reason, message }),
   });
 });
 
-app.get('/api/refund/draft', (req, res) => {
-  const { orderId, customerEmail, reason, message } = req.query;
-  if (!orderId || !customerEmail || !reason) {
-    return res.status(400).json({ error: 'orderId, customerEmail, and reason are required' });
-  }
-
-  res.json(buildRefundEmail({ orderId, customerEmail, reason, message: message || '' }));
+// Refund requests list (protected)
+app.get('/api/refund/requests', requireAdmin, (req, res) => {
+  res.json({ requests: db.listRefundRequests(req.query.limit) });
 });
 
 // Shopify webhook -> approve matching Sellvia order
@@ -359,10 +339,6 @@ app.get('/api/shopify/auth', (req, res) => {
     message:
       'This bridge uses webhook HMAC auth, not OAuth. Set the Shopify app secret in Render env vars.',
   });
-});
-
-app.get('/api/refund/requests', requireAdmin, (req, res) => {
-  res.json({ requests: db.listRefundRequests(req.query.limit) });
 });
 
 app.use(errorMiddleware);
