@@ -1,0 +1,458 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AUTOPILOT // CYBERNETIC COMMAND DASHBOARD</title>
+    <!-- Tailwind CSS for Responsive Layout & Styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js Library for 3D Cyber Graphics -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls for Intuitive Camera Drag & Zoom -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- FontAwesome Icons for High-Tech Visual Markers -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts for Futuristic Cyberpunk Typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
+    <style>
+        /* Modern Cyberpunk Visual Style Standards */
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #030712;
+            color: #22d3ee;
+            font-family: 'Share Tech Mono', monospace;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        h1, h2, h3, .font-orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        /* CRT Screen Scanline Overlay Effect */
+        .scanlines {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0, 0, 0, 0.3) 50%,
+                rgba(0, 0, 0, 0.3)
+            );
+            background-size: 100% 4px;
+            z-index: 10;
+            opacity: 0.6;
+        }
+
+        /* Subtle Ambient Cyber Radial Glow */
+        .cyber-vignette {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            background: radial-gradient(circle, transparent 50%, rgba(3, 7, 18, 0.85) 100%);
+            z-index: 9;
+        }
+
+        /* Glassmorphic Panel Styling */
+        .glass-panel {
+            background: rgba(8, 15, 30, 0.75);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(34, 211, 238, 0.25);
+            box-shadow: 0 0 15px rgba(34, 211, 238, 0.1), inset 0 0 15px rgba(34, 211, 238, 0.05);
+        }
+
+        /* Glowing High-Tech Borders */
+        .glow-border {
+            position: relative;
+        }
+        .glow-border::after {
+            content: '';
+            position: absolute;
+            top: -1px; left: -1px; right: -1px; bottom: -1px;
+            background: linear-gradient(45deg, #22d3ee, transparent, #10b981);
+            z-index: -1;
+            border-radius: inherit;
+            opacity: 0.4;
+        }
+
+        /* Custom Animated Jump Button */
+        .jump-btn {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(220, 38, 38, 0.6));
+            border: 2px solid #ef4444;
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.5), inset 0 0 10px rgba(239, 68, 68, 0.3);
+            transition: all 0.2s ease-in-out;
+            animation: pulse-red 2s infinite;
+        }
+
+        .jump-btn:hover {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.6), rgba(220, 38, 38, 0.9));
+            box-shadow: 0 0 35px rgba(239, 68, 68, 0.8), inset 0 0 15px rgba(255, 255, 255, 0.5);
+            transform: scale(1.02);
+        }
+
+        .jump-btn:active {
+            transform: scale(0.98);
+        }
+
+        @keyframes pulse-red {
+            0%, 100% { box-shadow: 0 0 15px rgba(239, 68, 68, 0.4); }
+            50% { box-shadow: 0 0 30px rgba(239, 68, 68, 0.8); }
+        }
+
+        /* Scrollbar Styling for Logs */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(3, 7, 18, 0.5);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #22d3ee;
+            border-radius: 2px;
+        }
+
+        /* 3D Canvas Canvas Styling */
+        #webgl-container {
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0; left: 0;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body class="w-full h-screen overflow-hidden">
+
+    <!-- FX Overlays -->
+    <div class="scanlines"></div>
+    <div class="cyber-vignette"></div>
+
+    <!-- 3D Canvas Container -->
+    <div id="webgl-container"></div>
+
+    <!-- UI Overlay Layer -->
+    <div class="relative z-20 w-full h-full flex flex-col justify-between p-4 sm:p-6 pointer-events-none">
+
+        <!-- Header Bar -->
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pointer-events-auto">
+            <div class="glass-panel px-5 py-3 rounded-xl flex items-center gap-4 border-l-4 border-l-cyan-400">
+                <i class="fa-solid fa-network-wired text-cyan-400 text-2xl animate-pulse"></i>
+                <div>
+                    <h1 class="font-orbitron text-xl sm:text-2xl font-black tracking-widest text-white flex items-center gap-2">
+                        FABULOUS GEMS <span class="text-xs bg-cyan-950 border border-cyan-500/50 text-cyan-400 px-2 py-0.5 rounded">v2.4</span>
+                    </h1>
+                    <p class="text-xs text-cyan-400/80 tracking-wider">SYSTEM AUTONOMY // NODE MATRIX NETWORK</p>
+                </div>
+            </div>
+
+            <!-- Header Quick Stats -->
+            <div class="glass-panel px-4 py-2 rounded-xl flex items-center gap-6 text-xs text-slate-300">
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+                    <span>BRIDGE: <strong class="text-emerald-400">PORT :10000</strong></span>
+                </div>
+                <div class="hidden sm:flex items-center gap-2">
+                    <i class="fa-solid fa-rotate text-cyan-400"></i>
+                    <span>WORKFLOW: <strong class="text-cyan-400">#1933 PASSING</strong></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="sound-toggle" class="hover:text-cyan-300 transition-colors">
+                        <i id="sound-icon" class="fa-solid fa-volume-high text-cyan-400"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Center Overlay Alert Message (Active during JUMP AYWA) -->
+        <div id="jump-banner" class="self-center glass-panel px-8 py-4 rounded-2xl border-2 border-red-500 text-center opacity-0 transition-all duration-300 transform scale-90 pointer-events-none">
+            <h2 class="font-orbitron text-2xl sm:text-4xl font-black text-red-500 tracking-widest animate-bounce">
+                ⚡ JUMP AYWA EXECUTING ⚡
+            </h2>
+            <p class="text-xs sm:text-sm text-red-300 tracking-widest mt-1">HIGH-VELOCITY AUTOMATED CHAIN REACTION ACTIVE</p>
+        </div>
+
+        <!-- Bottom Controls & Monitor Split Panel -->
+        <footer class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end pointer-events-auto">
+
+            <!-- Real-Time Cyber Console Logs -->
+            <div class="lg:col-span-5 glass-panel p-4 rounded-xl flex flex-col h-48 sm:h-56">
+                <div class="flex justify-between items-center mb-2 pb-1 border-b border-cyan-500/30">
+                    <span class="font-orbitron text-xs font-bold text-cyan-300 flex items-center gap-2">
+                        <i class="fa-solid fa-terminal"></i> LIVE EVENT TELEMETRY
+                    </span>
+                    <span class="text-[10px] text-cyan-400/60 uppercase" id="log-clock">00:00:00 UTC</span>
+                </div>
+                <div id="console-logs" class="flex-1 overflow-y-auto space-y-1.5 text-xs text-slate-300 pr-1">
+                    <!-- Dynamic Log Items Rendered Here -->
+                </div>
+            </div>
+
+            <!-- Middle Stats Cards -->
+            <div class="lg:col-span-4 grid grid-cols-3 gap-2 sm:gap-3">
+                <div class="glass-panel p-3 rounded-xl text-center flex flex-col justify-center">
+                    <p class="text-[10px] text-cyan-400/80 uppercase">Webhooks</p>
+                    <p id="stat-webhooks" class="font-orbitron text-lg sm:text-2xl font-bold text-cyan-300">1,012</p>
+                    <p class="text-[9px] text-emerald-400 mt-0.5"><i class="fa-solid fa-arrow-up"></i> Active</p>
+                </div>
+                <div class="glass-panel p-3 rounded-xl text-center flex flex-col justify-center">
+                    <p class="text-[10px] text-cyan-400/80 uppercase">Sync Delay</p>
+                    <p id="stat-latency" class="font-orbitron text-lg sm:text-2xl font-bold text-emerald-400">42ms</p>
+                    <p class="text-[9px] text-cyan-400 mt-0.5">Optimal</p>
+                </div>
+                <div class="glass-panel p-3 rounded-xl text-center flex flex-col justify-center">
+                    <p class="text-[10px] text-cyan-400/80 uppercase">Payouts</p>
+                    <p id="stat-payouts" class="font-orbitron text-lg sm:text-2xl font-bold text-yellow-400">$840.00</p>
+                    <p class="text-[9px] text-yellow-300 mt-0.5">Cleared</p>
+                </div>
+            </div>
+
+            <!-- Right Trigger Panel with EXPLICIT "JUMP AYWA" Button -->
+            <div class="lg:col-span-3 glass-panel p-4 rounded-xl flex flex-col items-center justify-center gap-3">
+                <div class="text-center">
+                    <span class="font-orbitron text-xs font-bold text-slate-300 tracking-wider block">EXECUTION CONTROLLER</span>
+                    <span class="text-[10px] text-cyan-400/70">Trigger Full Pipeline Simulation</span>
+                </div>
+                <button id="btn-jump-aywa" class="jump-btn w-full py-3.5 px-6 rounded-xl font-orbitron font-extrabold text-sm sm:text-base text-white tracking-widest flex items-center justify-center gap-3 cursor-pointer">
+                    <i class="fa-solid fa-bolt text-yellow-300 text-lg"></i>
+                    <span>JUMP AYWA</span>
+                </button>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Sound & Interactive Visual Logic Script -->
+    <script>
+        // Synthesized Cyber Sound Generator using Web Audio API (No External Audio File Dependencies)
+        class SoundFX {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+            }
+
+            playBlip(freq = 600, duration = 0.08) {
+                if (!this.enabled) return;
+                this.init();
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch(e) {}
+            }
+
+            playChainSequence() {
+                if (!this.enabled) return;
+                this.init();
+                const freqs = [300, 450, 600, 800, 1050, 1400];
+                freqs.forEach((f, idx) => {
+                    setTimeout(() => {
+                        this.playBlip(f, 0.12);
+                    }, idx * 180);
+                });
+            }
+        }
+
+        const audio = new SoundFX();
+
+        // Handle Audio Toggle UI
+        document.getElementById('sound-toggle').addEventListener('click', () => {
+            audio.enabled = !audio.enabled;
+            const icon = document.getElementById('sound-icon');
+            icon.className = audio.enabled ? "fa-solid fa-volume-high text-cyan-400" : "fa-solid fa-volume-xmark text-slate-500";
+        });
+
+        // Logging System
+        const logsContainer = document.getElementById('console-logs');
+        function addLog(message, type = 'info') {
+            const time = new Date().toISOString().substring(11, 19);
+            const entry = document.createElement('div');
+            entry.className = "flex items-start gap-2 leading-relaxed";
+
+            let typeBadge = `<span class="text-cyan-400 font-bold">[INFO]</span>`;
+            if (type === 'success') typeBadge = `<span class="text-emerald-400 font-bold">[SYNC]</span>`;
+            if (type === 'alert') typeBadge = `<span class="text-red-400 font-bold">[AYWA]</span>`;
+            if (type === 'warn') typeBadge = `<span class="text-yellow-400 font-bold">[PAYOUT]</span>`;
+
+            entry.innerHTML = `<span class="text-slate-500 text-[10px]">${time}</span> ${typeBadge} <span class="text-slate-200">${message}</span>`;
+            logsContainer.appendChild(entry);
+            logsContainer.scrollTop = logsContainer.scrollHeight;
+
+            // Keep log count manageable
+            while (logsContainer.children.length > 30) {
+                logsContainer.removeChild(logsContainer.firstChild);
+            }
+        }
+
+        // Live Clock Tracker
+        setInterval(() => {
+            document.getElementById('log-clock').innerText = new Date().toISOString().substring(11, 19) + ' UTC';
+        }, 1000);
+
+        // THREE.JS 3D CYBER NETWORK INITIALIZATION
+        const container = document.getElementById('webgl-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x030712, 0.025);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 15, 30);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxDistance = 60;
+        controls.minDistance = 10;
+        controls.maxPolarAngle = Math.PI / 2 + 0.1;
+
+        // Visual Nodes Config (Dropshipping Stack Nodes)
+        const nodesData = [
+            { id: 'shopify', name: 'SHOPIFY STORE', pos: new THREE.Vector3(-12, 2, 8), color: 0x10b981, icon: '🛒' },
+            { id: 'render', name: 'RENDER BRIDGE (:10000)', pos: new THREE.Vector3(-4, 6, -2), color: 0x22d3ee, icon: '⚡' },
+            { id: 'sellvia', name: 'SELLVIA WHLSE', pos: new THREE.Vector3(8, 3, -8), color: 0xa855f7, icon: '📦' },
+            { id: 'github', name: 'GITHUB ACTIONS (#1933)', pos: new THREE.Vector3(12, -2, 6), color: 0x3b82f6, icon: '⚙️' },
+            { id: 'stripe', name: 'STRIPE / PAYOUTS', pos: new THREE.Vector3(0, -6, 4), color: 0xeab308, icon: '💳' }
+        ];
+
+        const nodesGroup = new THREE.Group();
+        const nodeMeshes = {};
+        const connections = [];
+
+        // Build 3D Visual Nodes
+        nodesData.forEach(data => {
+            // Node Outer Glow Ring
+            const ringGeo = new THREE.RingGeometry(1.8, 2.1, 32);
+            const ringMat = new THREE.MeshBasicMaterial({ color: data.color, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
+            const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+            ringMesh.position.copy(data.pos);
+            ringMesh.lookAt(camera.position);
+
+            // Node Core Octahedron
+            const coreGeo = new THREE.OctahedronGeometry(1.2, 0);
+            const coreMat = new THREE.MeshStandardMaterial({ 
+                color: data.color, 
+                wireframe: true, 
+                emissive: data.color, 
+                emissiveIntensity: 0.6 
+            });
+            const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+            coreMesh.position.copy(data.pos);
+
+            // Node Inner Solid Center
+            const innerGeo = new THREE.SphereGeometry(0.5, 16, 16);
+            const innerMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const innerMesh = new THREE.Mesh(innerGeo, innerMat);
+            innerMesh.position.copy(data.pos);
+
+            nodesGroup.add(ringMesh);
+            nodesGroup.add(coreMesh);
+            nodesGroup.add(innerMesh);
+
+            nodeMeshes[data.id] = {
+                core: coreMesh,
+                ring: ringMesh,
+                pos: data.pos,
+                color: data.color,
+                data: data
+            };
+        });
+
+        scene.add(nodesGroup);
+
+        // Network Connecting Lines Topology
+        const networkTopology = [
+            ['shopify', 'render'],
+            ['render', 'sellvia'],
+            ['sellvia', 'github'],
+            ['github', 'shopify'],
+            ['shopify', 'stripe'],
+            ['render', 'stripe']
+        ];
+
+        const lineMaterial = new THREE.LineBasicMaterial({ color: 0x1e293b, transparent: true, opacity: 0.6 });
+
+        networkTopology.forEach(([fromId, toId]) => {
+            const fromNode = nodeMeshes[fromId];
+            const toNode = nodeMeshes[toId];
+
+            const points = [fromNode.pos, toNode.pos];
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            const line = new THREE.Line(geometry, lineMaterial);
+            scene.add(line);
+
+            connections.push({ from: fromNode, to: toNode, line: line });
+        });
+
+        // Ambient Cyber Floor Grid
+        const gridHelper = new THREE.GridHelper(80, 40, 0x22d3ee, 0x0f172a);
+        gridHelper.position.y = -10;
+        scene.add(gridHelper);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambientLight);
+
+        const pointLight = new THREE.PointLight(0x22d3ee, 2, 50);
+        pointLight.position.set(0, 10, 10);
+        scene.add(pointLight);
+
+        // Active Particle Systems for Packets Traveling Node to Node
+        const activeParticles = [];
+
+        function spawnDataPacket(fromNode, toNode, duration = 1.5, colorOverride = null) {
+            const particleGeo = new THREE.SphereGeometry(0.35, 12, 12);
+            const particleMat = new THREE.MeshBasicMaterial({ 
+                color: colorOverride || fromNode.color,
+                transparent: true,
+                opacity: 0.9 
+            });
+            const pMesh = new THREE.Mesh(particleGeo, particleMat);
+            scene.add(pMesh);
+
+            activeParticles.push({
+                mesh: pMesh,
+                start: fromNode.pos.clone(),
+                end: toNode.pos.clone(),
+                progress: 0,
+                speed: 1 / (duration * 60)
+            });
+        }
+
+        // Render Loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Rotate Node Cores
+            Object.values(nodeMeshes).forEach(node => {
+                node.core.rotation.x += 0.01;
+                node.core.rotation.y += 0.015;
+                node.ring.lookAt(camera.position);
+            });
+
+            // Update Traveling Particles
+            for (let i = activeParticles.length - 1; i >= 0; i--) {
+                const p = activeParticles[i];
+                p.progress += p.speed;
+
+                p.mesh
