@@ -1,9 +1,13 @@
-jesse-autopilot-bridge/
-├── package.json (you have - with extended description)
-├── server.js (you have - with autopilot logic for 3 WON orders)
-├── render.yaml ← ADD THIS NEXT
-├── .env.example
-├── .gitignore
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+*.log
+coverage.xml
+.coverage
 node_modules/
 data/
 *.db

@@ -1,0 +1,51 @@
+name: Python review backend checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  offline-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install hashed dependencies
+        run: python -m pip install --require-hashes -r requirements-dev.lock.txt
+      - name: Dependency consistency and compilation
+        run: |
+          python -m pip check
+          python -m compileall -q app.py wsgi.py review.py storage.py tests
+      - name: Offline synthetic tests (Python socket connections forbidden)
+        run: python -m pytest -m 'not integration' -q
+      - name: Known-vulnerability gate (audit queries public advisory service)
+        run: |
+          pip-audit -r requirements.lock.txt --disable-pip --no-deps
+          pip-audit -r requirements-dev.lock.txt --disable-pip --no-deps
+  disposable-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: bridge_review_ci
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d bridge_review_ci"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --require-hashes -r requirements-dev.lock.txt
+      - run: python -m pip check
+      - name: Real receipt, migration and rollback tests in disposable database
+        env:
+          REVIEW_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/bridge_review_ci
+        run: python -m pytest -m integration -q
+# No deploy job, production secrets, scheduled jobs or production database access.
