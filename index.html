@@ -1,10 +1,9 @@
-```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AUTOPILOT // CYBERNETIC COMMAND DASHBOARD</title>
+    <title>SIMULATED // CYBERNETIC COMMAND DASHBOARD</title>
     <!-- Tailwind CSS for Responsive Layout & Styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Three.js Library for 3D Cyber Graphics -->
@@ -146,7 +145,7 @@
                     <h1 class="font-orbitron text-xl sm:text-2xl font-black tracking-widest text-white flex items-center gap-2">
                         FABULOUS GEMS <span class="text-xs bg-cyan-950 border border-cyan-500/50 text-cyan-400 px-2 py-0.5 rounded">v2.4</span>
                     </h1>
-                    <p class="text-xs text-cyan-400/80 tracking-wider">SYSTEM AUTONOMY // NODE MATRIX NETWORK</p>
+                    <p class="text-xs text-cyan-400/80 tracking-wider">SIMULATION ONLY // NO LIVE ORDERS, REVENUE OR PAYOUTS</p>
                 </div>
             </div>
 
@@ -154,11 +153,11 @@
             <div class="glass-panel px-4 py-2 rounded-xl flex items-center gap-6 text-xs text-slate-300">
                 <div class="flex items-center gap-2">
                     <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
-                    <span>BRIDGE: <strong class="text-emerald-400">PORT :10000</strong></span>
+                    <span>SIMULATED BRIDGE: <strong class="text-emerald-400">PORT :10000</strong></span>
                 </div>
                 <div class="hidden sm:flex items-center gap-2">
                     <i class="fa-solid fa-rotate text-cyan-400"></i>
-                    <span>WORKFLOW: <strong class="text-cyan-400">#1933 PASSING</strong></span>
+                    <span>SIMULATED WORKFLOW: <strong class="text-cyan-400">#1933 PASSING</strong></span>
                 </div>
                 <div class="flex items-center gap-2">
                     <button id="sound-toggle" class="hover:text-cyan-300 transition-colors">
@@ -171,9 +170,9 @@
         <!-- Center Overlay Alert Message (Active during JUMP AYWA) -->
         <div id="jump-banner" class="self-center glass-panel px-8 py-4 rounded-2xl border-2 border-red-500 text-center opacity-0 transition-all duration-300 transform scale-90 pointer-events-none">
             <h2 class="font-orbitron text-2xl sm:text-4xl font-black text-red-500 tracking-widest animate-bounce">
-                ⚡ JUMP AYWA EXECUTING ⚡
+                ⚡ SIMULATED JUMP AYWA ⚡
             </h2>
-            <p class="text-xs sm:text-sm text-red-300 tracking-widest mt-1">HIGH-VELOCITY AUTOMATED CHAIN REACTION ACTIVE</p>
+            <p class="text-xs sm:text-sm text-red-300 tracking-widest mt-1">SIMULATED CHAIN REACTION — NO FINANCIAL ACTIONS</p>
         </div>
 
         <!-- Bottom Controls & Monitor Split Panel -->
@@ -183,7 +182,7 @@
             <div class="lg:col-span-5 glass-panel p-4 rounded-xl flex flex-col h-48 sm:h-56">
                 <div class="flex justify-between items-center mb-2 pb-1 border-b border-cyan-500/30">
                     <span class="font-orbitron text-xs font-bold text-cyan-300 flex items-center gap-2">
-                        <i class="fa-solid fa-terminal"></i> LIVE EVENT TELEMETRY
+                        <i class="fa-solid fa-terminal"></i> SIMULATED EVENT TELEMETRY
                     </span>
                     <span class="text-[10px] text-cyan-400/60 uppercase" id="log-clock">00:00:00 UTC</span>
                 </div>
@@ -195,26 +194,26 @@
             <!-- Middle Stats Cards -->
             <div class="lg:col-span-4 grid grid-cols-3 gap-2 sm:gap-3">
                 <div class="glass-panel p-3 rounded-xl text-center flex flex-col justify-center">
-                    <p class="text-[10px] text-cyan-400/80 uppercase">Webhooks</p>
+                    <p class="text-[10px] text-cyan-400/80 uppercase">SIMULATED Webhooks</p>
                     <p id="stat-webhooks" class="font-orbitron text-lg sm:text-2xl font-bold text-cyan-300">1,012</p>
                     <p class="text-[9px] text-emerald-400 mt-0.5"><i class="fa-solid fa-arrow-up"></i> Active</p>
                 </div>
                 <div class="glass-panel p-3 rounded-xl text-center flex flex-col justify-center">
-                    <p class="text-[10px] text-cyan-400/80 uppercase">Sync Delay</p>
+                    <p class="text-[10px] text-cyan-400/80 uppercase">SIMULATED Sync Delay</p>
                     <p id="stat-latency" class="font-orbitron text-lg sm:text-2xl font-bold text-emerald-400">42ms</p>
                     <p class="text-[9px] text-cyan-400 mt-0.5">Optimal</p>
                 </div>
                 <div class="glass-panel p-3 rounded-xl text-center flex flex-col justify-center">
-                    <p class="text-[10px] text-cyan-400/80 uppercase">Payouts</p>
+                    <p class="text-[10px] text-cyan-400/80 uppercase">SIMULATED Payouts</p>
                     <p id="stat-payouts" class="font-orbitron text-lg sm:text-2xl font-bold text-yellow-400">$840.00</p>
-                    <p class="text-[9px] text-yellow-300 mt-0.5">Cleared</p>
+                    <p class="text-[9px] text-yellow-300 mt-0.5">SIMULATED — Not Payable</p>
                 </div>
             </div>
 
             <!-- Right Trigger Panel with EXPLICIT "JUMP AYWA" Button -->
             <div class="lg:col-span-3 glass-panel p-4 rounded-xl flex flex-col items-center justify-center gap-3">
                 <div class="text-center">
-                    <span class="font-orbitron text-xs font-bold text-slate-300 tracking-wider block">EXECUTION CONTROLLER</span>
+                    <span class="font-orbitron text-xs font-bold text-slate-300 tracking-wider block">SIMULATION CONTROLLER</span>
                     <span class="text-[10px] text-cyan-400/70">Trigger Full Pipeline Simulation</span>
                 </div>
                 <button id="btn-jump-aywa" class="jump-btn w-full py-3.5 px-6 rounded-xl font-orbitron font-extrabold text-sm sm:text-base text-white tracking-widest flex items-center justify-center gap-3 cursor-pointer">
@@ -328,11 +327,11 @@
 
         // Visual Nodes Config (Dropshipping Stack Nodes)
         const nodesData = [
-            { id: 'shopify', name: 'SHOPIFY STORE', pos: new THREE.Vector3(-12, 2, 8), color: 0x10b981, icon: '🛒' },
-            { id: 'render', name: 'RENDER BRIDGE (:10000)', pos: new THREE.Vector3(-4, 6, -2), color: 0x22d3ee, icon: '⚡' },
-            { id: 'sellvia', name: 'SELLVIA WHLSE', pos: new THREE.Vector3(8, 3, -8), color: 0xa855f7, icon: '📦' },
-            { id: 'github', name: 'GITHUB ACTIONS (#1933)', pos: new THREE.Vector3(12, -2, 6), color: 0x3b82f6, icon: '⚙️' },
-            { id: 'stripe', name: 'STRIPE / PAYOUTS', pos: new THREE.Vector3(0, -6, 4), color: 0xeab308, icon: '💳' }
+            { id: 'shopify', name: 'SIMULATED SHOPIFY STORE', pos: new THREE.Vector3(-12, 2, 8), color: 0x10b981, icon: '🛒' },
+            { id: 'render', name: 'SIMULATED RENDER BRIDGE (:10000)', pos: new THREE.Vector3(-4, 6, -2), color: 0x22d3ee, icon: '⚡' },
+            { id: 'sellvia', name: 'SIMULATED SELLVIA WHLSE', pos: new THREE.Vector3(8, 3, -8), color: 0xa855f7, icon: '📦' },
+            { id: 'github', name: 'SIMULATED GITHUB ACTIONS (#1933)', pos: new THREE.Vector3(12, -2, 6), color: 0x3b82f6, icon: '⚙️' },
+            { id: 'stripe', name: 'SIMULATED STRIPE / PAYOUTS', pos: new THREE.Vector3(0, -6, 4), color: 0xeab308, icon: '💳' }
         ];
 
         const nodesGroup = new THREE.Group();
